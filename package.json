@@ -1,0 +1,24 @@
+{
+  "name": "@justpush/justpush",
+  "version": "0.1.0",
+  "license": "MIT",
+  "scripts": {
+    "precompile": "yarn format:sol",
+    "compile": "tronbox compile",
+    "deploy:shasta": "tronbox migrate --network shasta",
+    "read": "ts-node scripts/read.ts",
+    "format:sol": "prettier --write 'contracts/**/*.sol'"
+  },
+  "devDependencies": {
+    "@types/chai": "^4.3.3",
+    "@types/mocha": "^10.0.0",
+    "@types/node": "^18.7.23",
+    "dotenv": "^16.0.3",
+    "prettier": "^2.7.1",
+    "prettier-plugin-solidity": "^1.0.0-beta.24",
+    "tronbox": "^2.7.25",
+    "tronweb": "^4.4.0",
+    "ts-node": "^10.9.1",
+    "typescript": "^4.8.4"
+  }
+}
