@@ -2,11 +2,16 @@
 pragma solidity 0.8.6;
 
 import "./interfaces/IJustPushV1.sol";
+import "./interfaces/IBroadcastNotificationSender.sol";
+import "./interfaces/IDirectNotificationSender.sol";
 
-contract JustPushV1 is IJustPushV1 {
+contract JustPushV1 is
+    IJustPushV1,
+    IBroadcastNotificationSender,
+    IDirectNotificationSender
+{
     uint256 public groupCount;
-    mapping(uint256 => Group) public groups;
-    mapping(address => User) public users;
+    mapping(string => Group) public groups;
 
     address public justPushGovernance;
 
@@ -36,45 +41,12 @@ contract JustPushV1 is IJustPushV1 {
          */
         uint8 state;
         /**
-         * @notice A Json string that holds the group name, description, and other metadata.
-         * Can only be updated by the group owner.
-         *  {
-         *      "name" : "JustLend",
-         *      "description" : "JustLend notifications",
-         *      "website" : "https://justlend.io",
-         *      "logo:" : "https://justlend.io/logo.png"
-         *  }
-         */
-        string data;
-        /**
          * @notice Represents whether the group is a verified group.
          * By default all groups are unverified.
          * Popular dapps (justlend, justswap, etc) can be verified by JustPush governance.
          */
         bool verified;
         /** @notice Represent when the group was created */
-        uint256 createdAt;
-    }
-
-    struct User {
-        /**
-         * @notice Represents the state of the user.
-         * 0 - inactive
-         * 1 - active
-         */
-        uint8 state;
-        /**
-         * @notice Represents the user's subscription to a group.
-         * 0 - not interacted
-         * 1 - subscribed
-         * 2 - unsubscribed
-         */
-        mapping(uint256 => uint8) isSubscribed;
-        /** @notice Keeps track off all subscribed (and later might have unsubscribed) groups */
-        uint256[] groupsInteractedWith;
-        /** Number of total subscribed groups */
-        uint256 subscribedGroupsCount;
-        /** @notice Represent when the user was created */
         uint256 createdAt;
     }
 
@@ -86,7 +58,7 @@ contract JustPushV1 is IJustPushV1 {
         _;
     }
 
-    modifier onlyGroupOwner(uint256 _groupId) {
+    modifier onlyGroupOwner(string memory _groupId) {
         require(
             groups[_groupId].owner == msg.sender ||
                 msg.sender == justPushGovernance,
@@ -95,7 +67,7 @@ contract JustPushV1 is IJustPushV1 {
         _;
     }
 
-    modifier onlyNotifier(uint256 _groupId) {
+    modifier onlyNotifier(string memory _groupId) {
         require(
             groups[_groupId].isNotifier[msg.sender] ||
                 groups[_groupId].owner == msg.sender ||
@@ -105,7 +77,7 @@ contract JustPushV1 is IJustPushV1 {
         _;
     }
 
-    modifier activeGroup(uint256 _groupId) {
+    modifier activeGroup(string memory _groupId) {
         require(
             groups[_groupId].state == 1,
             "JustPushV1::activeGroup: Group is not active"
@@ -113,7 +85,7 @@ contract JustPushV1 is IJustPushV1 {
         _;
     }
 
-    modifier inactiveGroup(uint256 _groupId) {
+    modifier inactiveGroup(string memory _groupId) {
         require(
             groups[_groupId].state == 0,
             "JustPushV1::inactiveGroup: Group is not inactive"
@@ -121,21 +93,48 @@ contract JustPushV1 is IJustPushV1 {
         _;
     }
 
-    modifier activeUser() {
-        require(
-            users[msg.sender].state == 1,
-            "JustPushV1::activeUser: User is not active"
-        );
-        _;
-    }
+    // Events
+    event GroupCreated(
+        string groupId,
+        address owner,
+        string data,
+        uint256 createdAt
+    );
 
-    modifier subscribedUser(uint256 _groupId, address _user) {
-        require(
-            users[_user].isSubscribed[_groupId] == 1,
-            "JustPushV1::subscribedUser: User is not subscribed"
-        );
-        _;
-    }
+    event NotifierAdded(string groupId, address notifier);
+
+    event NotifierRemoved(string groupId, address notifier);
+
+    event BroadcastNotificationSent(
+        string groupId,
+        address notifier,
+        string title,
+        string content,
+        uint256 createdAt
+    );
+
+    event DirectNotificationSent(
+        string groupId,
+        address notifier,
+        address receiver,
+        string title,
+        string content,
+        uint256 createdAt
+    );
+
+    event GroupOwnerChanged(string groupId, address oldOwner, address newOwner);
+
+    event GroupStateChanged(string groupId, uint8 oldState, uint8 newState);
+
+    event SubscripitonChanged(
+        string groupId,
+        address subscriber,
+        bool subscribed
+    );
+
+    event GroupVerified(string groupId, bool verified);
+
+    event GovernanceChanged(address oldGovernance, address newGovernance);
 
     /**
      * @notice Initializes the protocol.
@@ -151,37 +150,68 @@ contract JustPushV1 is IJustPushV1 {
 
     /**
      * @notice Creates a new notification group.
+     * @param _id A unique identifier for the group.
+     * @param _owner Owner of the group.
      * @param _data A Json string that holds the group name, description, and other metadata.
-     * @return groupId The id of the newly created group.
      */
-    function createGroup(string memory _data)
-        external
-        override
-        returns (uint256 groupId)
-    {
-        groupId = groupCount;
-        groups[groupId].state = 1;
-        groups[groupId].owner = msg.sender;
-        groups[groupId].data = _data;
-        groups[groupId].createdAt = block.timestamp;
-        groupCount++;
+    function createGroup(
+        string memory _id,
+        address _owner,
+        string calldata _data
+    ) external override {
+        groupCount = groupCount + 1;
+        require(
+            groups[_id].state == 0,
+            "JustPushV1::createGroup: Group already exists."
+        );
+        groups[_id].state = 1;
+        groups[_id].owner = _owner;
+        groups[_id].createdAt = block.timestamp;
 
-        // todo: subscribe to the owner to the group
-        // todo: subscribe owner to the push protocol communication group
-        return groupId;
+        emit GroupCreated(_id, _owner, _data, block.timestamp);
     }
 
     /**
-     * @notice Updates the group data.
+     * @notice Send broadcast notification to a group.
      * @param _groupId The id of the group.
-     * @param _data A Json string that holds the group name, description, and other metadata.
+     * @param _title The title of the notification.
+     * @param _content The content of the notification.
      */
-    function changeData(uint256 _groupId, string memory _data)
-        external
-        override
-        onlyGroupOwner(_groupId)
-    {
-        groups[_groupId].data = _data;
+    function sendBroadcastNotification(
+        string memory _groupId,
+        string calldata _title,
+        string calldata _content
+    ) external override onlyNotifier(_groupId) activeGroup(_groupId) {
+        emit BroadcastNotificationSent(
+            _groupId,
+            msg.sender,
+            _title,
+            _content,
+            block.timestamp
+        );
+    }
+
+    /**
+     * @notice Send notification to a group.
+     * @param _groupId The id of the group.
+     * @param _receiver The address of the receiver.
+     * @param _title The title of the notification.
+     * @param _content The content of the notification.
+     */
+    function sendNotification(
+        string memory _groupId,
+        address _receiver,
+        string calldata _title,
+        string calldata _content
+    ) external override onlyNotifier(_groupId) activeGroup(_groupId) {
+        emit DirectNotificationSent(
+            _groupId,
+            _receiver,
+            msg.sender,
+            _title,
+            _content,
+            block.timestamp
+        );
     }
 
     /**
@@ -189,7 +219,7 @@ contract JustPushV1 is IJustPushV1 {
      * @param _groupId The id of the group.
      * @param _notifier The address of the notifier.
      */
-    function addNotifier(uint256 _groupId, address _notifier)
+    function addNotifier(string memory _groupId, address _notifier)
         external
         override
         onlyGroupOwner(_groupId)
@@ -200,6 +230,7 @@ contract JustPushV1 is IJustPushV1 {
         );
         groups[_groupId].notifiers.push(_notifier);
         groups[_groupId].isNotifier[_notifier] = true;
+        emit NotifierAdded(_groupId, _notifier);
     }
 
     /**
@@ -207,7 +238,7 @@ contract JustPushV1 is IJustPushV1 {
      * @param _groupId The id of the group.
      * @param _notifier The address of the notifier.
      */
-    function disableNotifier(uint256 _groupId, address _notifier)
+    function disableNotifier(string memory _groupId, address _notifier)
         external
         override
         onlyGroupOwner(_groupId)
@@ -217,6 +248,7 @@ contract JustPushV1 is IJustPushV1 {
             "JustPushV1::disableNotifier: Notifier does not exist"
         );
         groups[_groupId].isNotifier[_notifier] = false;
+        emit NotifierRemoved(_groupId, _notifier);
     }
 
     /**
@@ -224,77 +256,95 @@ contract JustPushV1 is IJustPushV1 {
      * @param _groupId The id of the group.
      * @param _newOwner The address of the new owner.
      */
-    function changeGroupOwner(uint256 _groupId, address _newOwner)
+    function changeGroupOwner(string memory _groupId, address _newOwner)
         external
         override
         onlyGroupOwner(_groupId)
     {
         groups[_groupId].owner = _newOwner;
-        // todo: subscribe to the new owner to the group
-        // todo: subscribe the new owner to the push protocol communication group
+        emit GroupOwnerChanged(_groupId, msg.sender, _newOwner);
     }
 
     /**
      * @notice Deactivates a group.
      * @param _groupId The id of the group.
      */
-    function deactivateGroup(uint256 _groupId)
+    function deactivateGroup(string memory _groupId)
         external
         override
         onlyGroupOwner(_groupId)
         activeGroup(_groupId)
     {
         groups[_groupId].state = 3;
+        emit GroupStateChanged(_groupId, 1, 3);
     }
 
     /**
      * @notice Activates a group.
      * @param _groupId The id of the group.
      */
-    function activateGroup(uint256 _groupId)
+    function activateGroup(string memory _groupId)
         external
         override
         onlyGroupOwner(_groupId)
         inactiveGroup(_groupId)
     {
         groups[_groupId].state = 1;
+        emit GroupStateChanged(_groupId, 0, 1);
     }
 
     /**
      * @notice Blocks a group.
      * @param _groupId The id of the group.
      */
-    function blockGroup(uint256 _groupId) external override onlyGovernance {
+    function blockGroup(string memory _groupId)
+        external
+        override
+        onlyGovernance
+    {
+        uint8 previous = groups[_groupId].state;
         groups[_groupId].state = 4;
+        emit GroupStateChanged(_groupId, previous, 4);
     }
 
     /**
      * @notice Verifies a group.
      * @param _groupId The id of the group.
      */
-    function verifyGroup(uint256 _groupId) external override onlyGovernance {
+    function verifyGroup(string memory _groupId)
+        external
+        override
+        onlyGovernance
+    {
         groups[_groupId].verified = true;
+        emit GroupVerified(_groupId, true);
     }
 
     /**
      * @notice Unverifies a group.
      * @param _groupId The id of the group.
      */
-    function unverifyGroup(uint256 _groupId) external override onlyGovernance {
+    function unverifyGroup(string memory _groupId)
+        external
+        override
+        onlyGovernance
+    {
         groups[_groupId].verified = false;
+        emit GroupVerified(_groupId, false);
     }
 
     /**
      * @notice Verifies batch of groups.
      * @param _groupIds The ids of the groups.
      */
-    function batchVerifyGroups(uint256[] memory _groupIds)
+    function batchVerifyGroups(string[] memory _groupIds)
         external
         override
         onlyGovernance
     {
         for (uint256 i = 0; i < _groupIds.length; i++) {
             groups[_groupIds[i]].verified = true;
+            emit GroupVerified(_groupIds[i], true);
         }
     }
 
@@ -302,10 +352,9 @@ contract JustPushV1 is IJustPushV1 {
      * @notice Subscribes a user to a group.
      * @param _groupId The id of the group.
      */
-    function subscribe(uint256 _groupId)
+    function subscribe(string memory _groupId)
         external
         override
-        activeUser
         activeGroup(_groupId)
     {
         _subscribe(_groupId, msg.sender);
@@ -315,11 +364,7 @@ contract JustPushV1 is IJustPushV1 {
      * @notice Batch subscribe a user to multiple groups.
      * @param _groupIds The ids of the groups.
      */
-    function batchSubscribe(uint256[] memory _groupIds)
-        external
-        override
-        activeUser
-    {
+    function batchSubscribe(string[] memory _groupIds) external override {
         for (uint256 i = 0; i < _groupIds.length; i++) {
             _subscribe(_groupIds[i], msg.sender);
         }
@@ -329,10 +374,9 @@ contract JustPushV1 is IJustPushV1 {
      * @notice Unsubscribes a user from a group.
      * @param _groupId The id of the group.
      */
-    function unsubscribe(uint256 _groupId)
+    function unsubscribe(string memory _groupId)
         external
         override
-        activeUser
         activeGroup(_groupId)
     {
         _unsubscribe(_groupId, msg.sender);
@@ -342,39 +386,32 @@ contract JustPushV1 is IJustPushV1 {
      * @notice Batch unsubscribe a user from multiple groups.
      * @param _groupIds The ids of the groups.
      */
-    function batchUnsubscribe(uint256[] memory _groupIds)
-        external
-        override
-        activeUser
-    {
+    function batchUnsubscribe(string[] memory _groupIds) external override {
         for (uint256 i = 0; i < _groupIds.length; i++) {
             _unsubscribe(_groupIds[i], msg.sender);
         }
     }
 
-    function _subscribe(uint256 _groupId, address _user)
-        private
-        activeGroup(_groupId)
+    function changeGovernace(address _newGovernance)
+        external
+        override
+        onlyGovernance
     {
-        User storage user = users[_user];
-        if (user.isSubscribed[_groupId] == 0) {
-            user.isSubscribed[_groupId] = 1;
-            user.subscribedGroupsCount = user.subscribedGroupsCount + 1;
-            user.groupsInteractedWith.push(_groupId);
-        } else if (user.isSubscribed[_groupId] == 2) {
-            user.isSubscribed[_groupId] = 1;
-            user.subscribedGroupsCount = user.subscribedGroupsCount + 1;
-        }
+        justPushGovernance = _newGovernance;
+        emit GovernanceChanged(msg.sender, _newGovernance);
     }
 
-    function _unsubscribe(uint256 _groupId, address _user)
+    function _subscribe(string memory _groupId, address _user)
         private
         activeGroup(_groupId)
     {
-        User storage user = users[_user];
-        if (user.isSubscribed[_groupId] == 1) {
-            user.isSubscribed[_groupId] = 2;
-            user.subscribedGroupsCount = user.subscribedGroupsCount - 1;
-        }
+        emit SubscripitonChanged(_groupId, _user, true);
+    }
+
+    function _unsubscribe(string memory _groupId, address _user)
+        private
+        activeGroup(_groupId)
+    {
+        emit SubscripitonChanged(_groupId, _user, true);
     }
 }
