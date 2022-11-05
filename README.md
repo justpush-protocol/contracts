@@ -45,6 +45,6 @@ The protocol consists of several componenets.
 
 This repository contains the contracts that is deployed on TRON blockchain.
 
-Indepth detail of the contract code can be found in here: [[https://docs.justpush.app/contracts](https://docs.justpush.app/contracts)]
+Indepth detail of the contract code can be found in here: [https://docs.justpush.app/developer-resources/smart-contracts](https://docs.justpush.app/developer-resources/smart-contracts)
 
 ---
