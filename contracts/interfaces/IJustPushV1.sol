@@ -108,4 +108,14 @@ interface IJustPushV1 {
      * @param _newGovernance The address of the new governance.
      */
     function changeGovernace(address _newGovernance) external;
+
+    /**
+     * @notice Find out if an address is a notifier of a group.
+     * @param _groupId The id of the group.
+     * @param _notifier The address of the notifier.
+     */
+    function isNotifier(string memory _groupId, address _notifier)
+        external
+        view
+        returns (bool);
 }

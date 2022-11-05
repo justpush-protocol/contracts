@@ -172,18 +172,6 @@ contract JustPushV1 is
     }
 
     /**
-     * @notice Get group data.
-     * @param _groupId The id of the group.
-     */
-    function getGroup(string memory _groupId)
-        external
-        view
-        returns (Group memory)
-    {
-        return groups[_groupId];
-    }
-
-    /**
      * @notice Send broadcast notification to a group.
      * @param _groupId The id of the group.
      * @param _title The title of the notification.
@@ -261,6 +249,32 @@ contract JustPushV1 is
         );
         groupNotifiers[_groupId][_notifier] = false;
         emit NotifierRemoved(_groupId, _notifier);
+    }
+
+    /**
+     * @notice Find out if an address is a notifier of a group.
+     * @param _groupId The id of the group.
+     * @param _notifier The address of the notifier.
+     */
+    function isNotifier(string memory _groupId, address _notifier)
+        external
+        view
+        override
+        returns (bool)
+    {
+        return groupNotifiers[_groupId][_notifier];
+    }
+
+    /**
+     * @notice Get group data.
+     * @param _groupId The id of the group.
+     */
+    function getGroup(string memory _groupId)
+        external
+        view
+        returns (Group memory)
+    {
+        return groups[_groupId];
     }
 
     /**
@@ -404,6 +418,10 @@ contract JustPushV1 is
         }
     }
 
+    /**
+     * @notice Changes the JustPush governance.
+     * @param _newGovernance The address of the new governance.
+     */
     function changeGovernace(address _newGovernance)
         external
         override
