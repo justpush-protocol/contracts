@@ -12,6 +12,7 @@ contract JustPushV1 is
 {
     uint256 public groupCount;
     mapping(string => Group) public groups;
+    mapping(string => mapping(address => bool)) public groupNotifiers;
 
     address public justPushGovernance;
 
@@ -31,7 +32,6 @@ contract JustPushV1 is
          *     - push notifications
          */
         address[] notifiers;
-        mapping(address => bool) isNotifier;
         /**
          * @notice Represents the state of the group.
          * 0 - inactive
@@ -69,7 +69,7 @@ contract JustPushV1 is
 
     modifier onlyNotifier(string memory _groupId) {
         require(
-            groups[_groupId].isNotifier[msg.sender] ||
+            groupNotifiers[_groupId][msg.sender] == true ||
                 groups[_groupId].owner == msg.sender ||
                 msg.sender == justPushGovernance,
             "JustPushV1::onlyNotifier: Only notifier can call this function"
@@ -172,6 +172,18 @@ contract JustPushV1 is
     }
 
     /**
+     * @notice Get group data.
+     * @param _groupId The id of the group.
+     */
+    function getGroup(string memory _groupId)
+        external
+        view
+        returns (Group memory)
+    {
+        return groups[_groupId];
+    }
+
+    /**
      * @notice Send broadcast notification to a group.
      * @param _groupId The id of the group.
      * @param _title The title of the notification.
@@ -206,8 +218,8 @@ contract JustPushV1 is
     ) external override onlyNotifier(_groupId) activeGroup(_groupId) {
         emit DirectNotificationSent(
             _groupId,
-            _receiver,
             msg.sender,
+            _receiver,
             _title,
             _content,
             block.timestamp
@@ -225,11 +237,11 @@ contract JustPushV1 is
         onlyGroupOwner(_groupId)
     {
         require(
-            !groups[_groupId].isNotifier[_notifier],
+            groupNotifiers[_groupId][_notifier] == false,
             "JustPushV1::addNotifier: Notifier already exists"
         );
         groups[_groupId].notifiers.push(_notifier);
-        groups[_groupId].isNotifier[_notifier] = true;
+        groupNotifiers[_groupId][_notifier] = true;
         emit NotifierAdded(_groupId, _notifier);
     }
 
@@ -244,10 +256,10 @@ contract JustPushV1 is
         onlyGroupOwner(_groupId)
     {
         require(
-            groups[_groupId].isNotifier[_notifier],
+            groupNotifiers[_groupId][_notifier] == true,
             "JustPushV1::disableNotifier: Notifier does not exist"
         );
-        groups[_groupId].isNotifier[_notifier] = false;
+        groupNotifiers[_groupId][_notifier] = false;
         emit NotifierRemoved(_groupId, _notifier);
     }
 
