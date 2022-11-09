@@ -383,7 +383,7 @@ contract JustPushV1 is
         override
         activeGroup(_groupId)
     {
-        _subscribe(_groupId, msg.sender);
+        _subscribe(_groupId, tx.origin);
     }
 
     /**
@@ -392,7 +392,7 @@ contract JustPushV1 is
      */
     function batchSubscribe(string[] memory _groupIds) external override {
         for (uint256 i = 0; i < _groupIds.length; i++) {
-            _subscribe(_groupIds[i], msg.sender);
+            _subscribe(_groupIds[i], tx.origin);
         }
     }
 
@@ -405,7 +405,7 @@ contract JustPushV1 is
         override
         activeGroup(_groupId)
     {
-        _unsubscribe(_groupId, msg.sender);
+        _unsubscribe(_groupId, tx.origin);
     }
 
     /**
@@ -414,7 +414,7 @@ contract JustPushV1 is
      */
     function batchUnsubscribe(string[] memory _groupIds) external override {
         for (uint256 i = 0; i < _groupIds.length; i++) {
-            _unsubscribe(_groupIds[i], msg.sender);
+            _unsubscribe(_groupIds[i], tx.origin);
         }
     }
 

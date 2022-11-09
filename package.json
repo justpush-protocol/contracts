@@ -1,7 +1,7 @@
 {
   "name": "@justpush/contracts",
   "description": "Justpush is a protocol for push notifications on tron blockchain",
-  "version": "0.1.0-alpha.1",
+  "version": "0.1.0-alpha.2",
   "license": "MIT",
   "scripts": {
     "precompile": "yarn format:sol",
