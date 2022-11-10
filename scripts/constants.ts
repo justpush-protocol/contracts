@@ -1,2 +1,2 @@
-export const network = 'shasta';
-export const networkId = '2';
+export const network = 'tron';
+export const networkId = '1';

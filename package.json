@@ -1,12 +1,13 @@
 {
   "name": "@justpush/contracts",
   "description": "Justpush is a protocol for push notifications on tron blockchain",
-  "version": "0.1.0-alpha.2",
+  "version": "0.1.0",
   "license": "MIT",
   "scripts": {
     "precompile": "yarn format:sol",
     "compile": "tronbox compile",
     "deploy:shasta": "tronbox migrate --network shasta",
+    "deploy:tron": "tronbox migrate --network mainnet",
     "create-group": "ts-node scripts/create-group.ts",
     "send-broadcast-notification": "ts-node scripts/send-broadcast-notification.ts",
     "send-direct-notification": "ts-node scripts/send-direct-notification",
